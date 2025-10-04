@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carbon Footprint Visualizer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 32px auto; padding: 0 16px; }
+    h1 { margin-bottom: 12px; }
+    h3 { margin: 8px 0; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 16px 0; }
+    label { display:block; margin: 8px 0 4px; font-weight: 600; }
+    input, select, button { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 8px; }
+    button { cursor: pointer; font-weight: 600; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .highlight { font-weight: 700; }
+    #notice { background:#fff3cd; border:1px solid #ffeeba; padding:10px; border-radius:8px; margin-top:10px; display:none; }
+    .subtle { color:#666; font-size: 0.9rem; }
+    .vehicles-row { display:grid; grid-template-columns: 1.1fr 0.9fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:8px; }
+    .vehicles-wrap { background:#f8f9fa; padding: 12px; border-radius: 8px; }
+    .city-search { position: relative; }
+    .city-suggestions {
+      position: absolute; z-index: 10; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid #ddd; border-radius: 8px;
+      max-height: 240px; overflow: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    }
+    .city-suggestions .item { padding: 10px 12px; cursor: pointer; }
+    .city-suggestions .item:hover, .city-suggestions .item.active { background: #f2f6ff; }
+    .right { text-align:right; }
+    .inline { display:inline-block; width:auto; }
+  </style>
+</head>
+<body>
+  <h1>Carbon Footprint Calculator</h1>
+
+  <div class="card">
+    <form id="carbonForm">
+      <div class="grid">
+        <div>
+          <label for="name">Your name</label>
+          <input id="name" placeholder="e.g., Rohith" />
+        </div>
+        <div>
+          <label for="locality">Locality / City</label>
+          <div class="city-search">
+            <input id="locality" autocomplete="off" placeholder="Start typing… e.g., Kochi" />
+            <div id="citySuggestions" class="city-suggestions" style="display:none;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <label for="bill">Monthly Electricity Bill (₹)</label>
+          <input id="bill" type="number" min="0" step="1" placeholder="e.g., 1200" />
+        </div>
+        <div>
+          <label for="lpg">LPG Cylinders / month</label>
+          <input id="lpg" type="number" min="0" step="0.1" placeholder="e.g., 0.5" />
+        </div>
+      </div>
+
+      <h3>Vehicles (add multiple)</h3>
+      <div class="vehicles-wrap">
+        <div id="vehicles"></div>
+        <button type="button" id="addVehicle" class="inline">+ Add Vehicle</button>
+        <p class="subtle">
+          For each vehicle, choose <strong>Petrol</strong> or <strong>Diesel</strong> or <strong>Electric</strong> (exactly one).<br>
+          Enter either daily distance (km/day) <em>or</em> monthly fuel (liters for petrol/diesel, kWh for electric).
+        </p>
+      </div>
+
+      <label class="subtle"><input type="checkbox" id="enableNotify" class="inline" /> Enable notifications for warnings & milestones</label>
+
+      <button type="submit">Calculate</button>
+    </form>
+  </div>
+
+  <div id="notice" class="card"></div>
+
+  <div class="card">
+    <h3>Results</h3>
+    <p><span class="highlight">Commute (all vehicles) CO₂:</span> <span id="commuteVal">—</span> kg/month</p>
+    <p><span class="highlight">Electricity CO₂:</span> <span id="energyVal">—</span> kg/month</p>
+    <p><span class="highlight">LPG CO₂:</span> <span id="lpgVal">—</span> kg/month</p>
+    <p><span class="highlight">Vehicle Energy/Fuel CO₂:</span> <span id="fuelVal">—</span> kg/month</p>
+    <p><span class="highlight">Total:</span> <span id="totalVal">—</span> kg/month</p>
+    <canvas id="myChart" width="400" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <h3>Estimated Monthly Spend (₹)</h3>
+    <div class="grid">
+      <div>Electricity: <span id="moneyElec">—</span></div>
+      <div>LPG: <span id="moneyLpg">—</span></div>
+      <div>Petrol: <span id="moneyPetrol">—</span></div>
+      <div>Diesel: <span id="moneyDiesel">—</span></div>
+    </div>
+    <p class="right"><span class="highlight">Total: <span id="moneyTotal">—</span></span></p>
+  </div>
+
+  <div class="card">
+    <h3>Money-Saving Tips</h3>
+    <ul id="tipsList"><li>Enter values and press Calculate to see tips.</li></ul>
+  </div>
+
+  <div class="card">
+    <h3>Leaderboard (<span id="leaderLoc">—</span>)</h3>
+    <button id="submitScoreBtn">Submit My Score</button>
+    <ul id="leaderList"></ul>
+  </div>
+
+  <div class="card">
+    <h3>Rewards</h3>
+    <p>Your points: <span id="pointsVal">0</span></p>
+    <ul id="rewardsList"></ul>
+  </div>
+
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
