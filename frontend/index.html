@@ -5,119 +5,334 @@
   <title>Carbon Footprint Visualizer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body { font-family: system-ui, Arial, sans-serif; max-width: 900px; margin: 32px auto; padding: 0 16px; }
-    h1 { margin-bottom: 12px; }
-    h3 { margin: 8px 0; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 16px 0; }
-    label { display:block; margin: 8px 0 4px; font-weight: 600; }
-    input, select, button { width: 100%; padding: 10px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 8px; }
-    button { cursor: pointer; font-weight: 600; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .highlight { font-weight: 700; }
-    #notice { background:#fff3cd; border:1px solid #ffeeba; padding:10px; border-radius:8px; margin-top:10px; display:none; }
-    .subtle { color:#666; font-size: 0.9rem; }
-    .vehicles-row { display:grid; grid-template-columns: 1.1fr 0.9fr 1fr 1fr auto; gap:8px; align-items:end; margin-bottom:8px; }
-    .vehicles-wrap { background:#f8f9fa; padding: 12px; border-radius: 8px; }
-    .city-search { position: relative; }
-    .city-suggestions {
-      position: absolute; z-index: 10; top: 100%; left: 0; right: 0;
-      background: #fff; border: 1px solid #ddd; border-radius: 8px;
-      max-height: 240px; overflow: auto; box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    /* ===== Eco / Environmental Theme ===== */
+    :root{
+      /* Forest base */
+      --forest-900:#135230;   /* deep forest */
+      --forest-800:#106836;
+      --forest-700:#049842;
+      --forest-600:#02dd59;
+
+      /* Accents (nature-inspired) */
+      --leaf:#2eb872;         /* leaf green */
+      --moss:#7cc77b;         /* moss */
+      --fern:#a7d49b;         /* fern */
+      --sky:#7cc3e6;          /* sky blue */
+      --sun:#f6c453;          /* warm sun (warnings) */
+      --clay:#d9b48f;         /* clay / soil accent */
+
+      /* Neutrals */
+      --text:#b9e2b9;         /* warm light */
+      --muted:#03b300;        /* soft mint */
+      --border:rgba(205,230,210,.22);
+      --paper:rgba(255,255,245,.06);
+
+      /* Shadows / glass */
+      --glass-1:rgb(1, 46, 10);
+      --glass-2:rgb(0, 73, 15);
     }
-    .city-suggestions .item { padding: 10px 12px; cursor: pointer; }
-    .city-suggestions .item:hover, .city-suggestions .item.active { background: #f2f6ff; }
-    .right { text-align:right; }
-    .inline { display:inline-block; width:auto; }
+    *{box-sizing:border-box}
+    body{
+      margin:0; color:var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      /* Forest canopy with sky glow and leaf pattern */
+      background:
+        radial-gradient(1200px 700px at 10% -20%, rgba(124,195,230,.22) 0%, transparent 60%),
+        radial-gradient(1000px 650px at 100% 0%, rgba(46,184,114,.18) 0%, transparent 55%),
+        linear-gradient(180deg, var(--forest-900), var(--forest-800) 40%, var(--forest-700) 100%),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 100 100"><g fill="%23ffffff" fill-opacity="0.02"><path d="M50 5c15 20 15 40 0 60-15-20-15-40 0-60z"/><circle cx="20" cy="80" r="8"/><circle cx="85" cy="35" r="6"/></g></svg>')
+          repeat;
+      background-attachment: fixed, fixed, fixed, fixed;
+    }
+
+    /* Header */
+    header{
+      position:sticky; top:0; z-index:50; padding:12px 16px;
+      display:flex; gap:14px; align-items:center; justify-content:space-between;
+      background:linear-gradient(180deg, rgba(15,36,24,.88), rgba(15,36,24,.64));
+      backdrop-filter: blur(10px); border-bottom:1px solid var(--border);
+    }
+    .brand{display:flex; align-items:center; gap:12px}
+    .logo{
+      width:42px;height:42px;border-radius:50%;
+      background:
+        radial-gradient(60% 60% at 35% 35%, rgba(255,255,255,.16), transparent 60%),
+        conic-gradient(from 0deg, var(--leaf), var(--moss), var(--fern), var(--sky), var(--leaf));
+      box-shadow: inset 0 0 16px rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.25);
+    }
+    h1{margin:0;font-size:1.12rem;letter-spacing:.2px}
+    .sub{color:var(--muted);font-size:.92rem}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px 16px 120px}
+
+    /* Hero */
+    .hero{
+      margin:10px 0 18px; padding:18px;
+      border:1px solid var(--border); border-radius:18px;
+      background:
+        radial-gradient(100% 140% at 0% 0%, rgba(46,184,114,.14), transparent 58%),
+        radial-gradient(100% 140% at 100% 100%, rgba(167,212,155,.12), transparent 58%),
+        linear-gradient(180deg, rgba(19,48,31,.92), rgba(15,36,24,.82));
+    }
+    .hero h2{margin:.2rem 0 .6rem; font-size:1.18rem}
+    .badges{display:flex;flex-wrap:wrap;gap:8px}
+    .badge{
+      font-size:.84rem; color:#0f2418; font-weight:800;
+      padding:8px 10px; border-radius:999px; background:linear-gradient(90deg,var(--leaf), var(--moss))
+    }
+    .pill{padding:6px 10px;border-radius:999px;border:1px solid var(--border);background:var(--glass-1);color:var(--text)}
+
+    /* Sections & cards */
+    .section{
+      border:1px solid var(--border); border-radius:18px; margin:12px 0; overflow:visible;
+      background:
+        linear-gradient(180deg, rgba(19,48,31,.92), rgba(19,48,31,.82)),
+        url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 6"><path d="M0 0h6v6H0z" fill="%23ffffff" fill-opacity="0.02"/></svg>') repeat;
+    }
+    .section summary{
+      list-style:none; cursor:pointer; padding:14px 16px; font-weight:800;
+      background:linear-gradient(90deg, rgba(46,184,114,.22), rgba(167,212,155,.18));
+    }
+    .content{padding:14px 16px; overflow:visible}
+    .card{
+      border:1px solid var(--border); border-radius:18px; padding:14px;
+      background:linear-gradient(180deg, rgba(26,59,39,.95), rgba(19,48,31,.88));
+      margin:12px 0;
+      box-shadow: 0 10px 26px rgba(0,0,0,.25);
+    }
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media (max-width: 900px){ .grid{grid-template-columns:1fr} }
+
+    /* Inputs */
+    label{display:block;margin:8px 0 6px;font-weight:700}
+    input, select{
+      width:100%; padding:12px 14px; border-radius:14px; color:var(--text);
+      background:var(--glass-1); border:1px solid var(--border); outline:none;
+      transition:border-color .15s, box-shadow .15s, transform .05s;
+    }
+    input:hover, select:hover{border-color:#a7d49b}
+    input:focus, select:focus{border-color:#7cc77b; box-shadow:0 0 0 4px rgba(124,199,123,.18); transform:translateY(-1px)}
+    .hint{color:var(--muted); font-size:.88rem}
+
+    /* Vehicles */
+    .vehicles-wrap{padding:12px;border:1px solid var(--border);border-radius:14px;background:var(--paper)}
+    .vehicles-row{display:grid; grid-template-columns:1.1fr .9fr 1fr 1fr auto; gap:10px; align-items:end; margin-bottom:10px}
+    @media (max-width: 780px){
+      .vehicles-row{grid-template-columns:1fr 1fr}
+      .vehicles-row > div:last-child{grid-column:1/-1}
+    }
+    .v-preview{font-size:.85rem;color:var(--muted);margin-top:6px}
+
+    /* Buttons */
+    .btn{appearance:none;border:0;border-radius:14px;padding:12px 16px;cursor:pointer;font-weight:800;letter-spacing:.3px;transition:transform .06s, filter .2s, box-shadow .2s}
+    .btn-primary{color:#0c2217;background:linear-gradient(90deg,var(--leaf), var(--moss) 55%, var(--fern)); box-shadow:0 10px 24px rgba(46,184,114,.25)}
+    .btn-primary:hover{filter:brightness(1.04); transform:translateY(-1px)}
+    .btn-ghost{background:var(--glass-1); border:1px solid var(--border); color:var(--text)}
+    .btn-ghost:hover{border-color:#a7d49b}
+    .remove{width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--glass-1);color:var(--muted)}
+    .remove:hover{border-color:#a7d49b}
+
+    /* Notice */
+    .notice{display:none;background:linear-gradient(90deg, rgba(246,196,83,.2), rgba(124,195,230,.18)); border:1px solid rgba(246,196,83,.45); color:#f3f0f0; padding:12px;border-radius:14px}
+
+    /* Progress */
+    .progress{margin:8px 0 6px;height:14px;background:var(--glass-1);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+    .progress > span{display:block;height:100%;background:linear-gradient(90deg,var(--leaf), var(--sky));width:0%}
+
+    /* Stats & Canvas */
+    .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    @media (max-width:760px){.stats{grid-template-columns:1fr}}
+    .stat{background:var(--glass-1);border:1px solid var(--border);border-radius:14px;padding:12px}
+    .stat .k{font-weight:800;font-size:1.08rem}
+    canvas{background:var(--glass-1);border:1px solid var(--border);border-radius:14px;padding:8px}
+
+    /* City dropdown (on top) */
+    .city-search{position:relative; z-index:1000}
+    .city-suggestions{
+      position:absolute; top:100%; left:0; right:0; z-index:9999;
+      background:rgba(11,26,18,.98); border:1px solid var(--border); border-radius:14px;
+      max-height:260px; overflow:auto; display:none;
+      box-shadow:0 18px 44px rgba(0,0,0,.45)
+    }
+    .city-suggestions .item{padding:10px 12px; cursor:pointer; border-bottom:1px dashed rgba(237,247,239,.07)}
+    .city-suggestions .item:hover, .city-suggestions .item.active{background:linear-gradient(90deg, rgba(46,184,114,.18), rgba(167,212,155,.18))}
+
+    /* Sticky action bar */
+    .actionbar{
+      position:fixed; left:0; right:0; bottom:0; z-index:45;
+      background:linear-gradient(180deg, rgba(11,26,18,.08), rgba(11,26,18,.74));
+      backdrop-filter: blur(10px); border-top:1px solid var(--border);
+      display:flex; align-items:center; gap:10px; padding:10px 16px; justify-content:center;
+    }
+    .actionbar .btn-primary{min-width:260px}
+
+    /* Eco divider (leaf) */
+    .leafline{
+      height:10px; margin:8px 0 0;
+      background:
+        radial-gradient(ellipse at 10px 50%, rgba(46,184,114,.5) 0 6px, transparent 7px),
+        linear-gradient(90deg, rgba(46,184,114,.35) 0 10px, transparent 10px) repeat-x;
+      background-size: 20px 10px, 20px 2px;
+      background-position: 0 0, 0 4px;
+      opacity:.7;
+    }
+
+    footer{color:var(--muted);text-align:center;padding:16px;margin-top:20px}
   </style>
 </head>
 <body>
-  <h1>Carbon Footprint Calculator</h1>
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Carbon Footprint Visualizer</h1>
+        <div class="sub">Track commute & energy • Tips • Rewards • Leaderboard</div>
+      </div>
+    </div>
+    <label class="sub"><input type="checkbox" id="enableNotify"> Notifications</label>
+  </header>
 
-  <div class="card">
-    <form id="carbonForm">
-      <div class="grid">
-        <div>
-          <label for="name">Your name</label>
-          <input id="name" placeholder="e.g., Rohith" />
-        </div>
-        <div>
-          <label for="locality">Locality / City</label>
-          <div class="city-search">
-            <input id="locality" autocomplete="off" placeholder="Start typing… e.g., Kochi" />
-            <div id="citySuggestions" class="city-suggestions" style="display:none;"></div>
+  <div class="wrap">
+    <div class="hero">
+      <h2>Let’s grow greener 🌱 — enter details, then tap <span class="pill">Calculate</span></h2>
+      <div class="badges">
+        <span class="badge">Low-Carbon Tips</span>
+        <span class="badge" style="background:linear-gradient(90deg,var(--leaf),var(--sky))">Clear Visuals</span>
+        <span class="badge" style="background:linear-gradient(90deg,var(--moss),var(--fern))">Rewards & Leaderboard</span>
+      </div>
+      <div class="leafline"></div>
+    </div>
+
+    <form id="carbonForm" novalidate>
+      <!-- Profile -->
+      <details class="section" open>
+        <summary>👤 Your Profile</summary>
+        <div class="content">
+          <div class="grid">
+            <div>
+              <label for="name">Your Name</label>
+              <input id="name" placeholder="e.g., Rohith" />
+              <div class="hint">Shown on the leaderboard</div>
+            </div>
+            <div>
+              <label for="locality">Locality / City</label>
+              <div class="city-search">
+                <input id="locality" autocomplete="off" placeholder="Start typing… e.g., Kochi" />
+                <div id="citySuggestions" class="city-suggestions"></div>
+              </div>
+              <div class="hint">Used for your local ranking</div>
+            </div>
           </div>
         </div>
-      </div>
+      </details>
 
-      <div class="grid">
-        <div>
-          <label for="bill">Monthly Electricity Bill (₹)</label>
-          <input id="bill" type="number" min="0" step="1" placeholder="e.g., 1200" />
+      <!-- Home Energy -->
+      <details class="section" open>
+        <summary>🏠 Home Energy</summary>
+        <div class="content grid">
+          <div>
+            <label for="bill">Monthly Electricity Bill (₹)</label>
+            <input id="bill" type="number" min="0" step="1" placeholder="e.g., 1200" />
+            <div class="hint">We estimate units using ₹8/kWh and 0.82 kg CO₂/kWh</div>
+          </div>
+          <div>
+            <label for="lpg">LPG Cylinders / month</label>
+            <input id="lpg" type="number" min="0" step="0.1" placeholder="e.g., 0.5" />
+            <div class="hint">One 14.2 kg cylinder ≈ 44.7 kg CO₂</div>
+          </div>
         </div>
-        <div>
-          <label for="lpg">LPG Cylinders / month</label>
-          <input id="lpg" type="number" min="0" step="0.1" placeholder="e.g., 0.5" />
+      </details>
+
+      <!-- Vehicles -->
+      <details class="section" open>
+        <summary>🚗 Vehicles</summary>
+        <div class="content">
+          <div class="vehicles-wrap">
+            <div id="vehicles"></div>
+            <button type="button" id="addVehicle" class="btn btn-ghost">+ Add Vehicle</button>
+            <div class="hint">Choose one fuel only. Enter <b>Km/day</b> or <b>Fuel per month</b>. Mini footprint preview shows under each row.</div>
+          </div>
         </div>
-      </div>
-
-      <h3>Vehicles (add multiple)</h3>
-      <div class="vehicles-wrap">
-        <div id="vehicles"></div>
-        <button type="button" id="addVehicle" class="inline">+ Add Vehicle</button>
-        <p class="subtle">
-          For each vehicle, choose <strong>Petrol</strong> or <strong>Diesel</strong> or <strong>Electric</strong> (exactly one).<br>
-          Enter either daily distance (km/day) <em>or</em> monthly fuel (liters for petrol/diesel, kWh for electric).
-        </p>
-      </div>
-
-      <label class="subtle"><input type="checkbox" id="enableNotify" class="inline" /> Enable notifications for warnings & milestones</label>
-
-      <button type="submit">Calculate</button>
+      </details>
     </form>
+
+    <!-- Results -->
+    <details class="section" open id="resultsSection">
+      <summary>📊 Your Results</summary>
+      <div class="content">
+        <div class="card">
+          <div class="hint">Monthly CO₂ vs personal goal (170 kg)</div>
+          <div class="progress" aria-label="Goal progress"><span id="progressBar"></span></div>
+          <div id="progressText" class="hint">Enter values and calculate to see your progress</div>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>Breakdown (kg CO₂ / month)</h3>
+            <div class="stats">
+              <div class="stat"><div class="muted">Commute (all vehicles)</div><div class="k" id="commuteVal">—</div></div>
+              <div class="stat"><div class="muted">Electricity</div><div class="k" id="energyVal">—</div></div>
+              <div class="stat"><div class="muted">LPG</div><div class="k" id="lpgVal">—</div></div>
+              <div class="stat"><div class="muted">Vehicle Energy/Fuel</div><div class="k" id="fuelVal">—</div></div>
+              <div class="stat" style="grid-column:1/-1"><div class="muted">Total</div><div class="k" id="totalVal" style="font-size:1.35rem">—</div></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Visual</h3>
+            <canvas id="myChart" width="400" height="320" aria-label="Emissions chart"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Estimated Monthly Spend (₹)</h3>
+          <div class="stats">
+            <div class="stat"><div class="muted">Electricity</div><div class="k" id="moneyElec">—</div></div>
+            <div class="stat"><div class="muted">LPG</div><div class="k" id="moneyLpg">—</div></div>
+            <div class="stat"><div class="muted">Petrol</div><div class="k" id="moneyPetrol">—</div></div>
+            <div class="stat"><div class="muted">Diesel</div><div class="k" id="moneyDiesel">—</div></div>
+          </div>
+          <p class="right"><b>Total: <span id="moneyTotal">—</span></b></p>
+        </div>
+
+        <div class="card">
+          <h3>Tips to Save</h3>
+          <ul id="tipsList" class="muted">
+            <li>Enter values and press Calculate to see tips.</li>
+          </ul>
+        </div>
+      </div>
+    </details>
+
+    <!-- Leaderboard / Rewards -->
+    <details class="section">
+      <summary>🏆 Leaderboard & 🎁 Rewards</summary>
+      <div class="content">
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <h3>Leaderboard (<span id="leaderLoc">—</span>)</h3>
+            <button id="submitScoreBtn" class="btn btn-ghost" type="button">Submit My Score</button>
+          </div>
+          <ul id="leaderList" class="muted"></ul>
+        </div>
+
+        <div class="card">
+          <h3>Rewards</h3>
+          <p>Your points: <span id="pointsVal">0</span></p>
+          <ul id="rewardsList" class="muted"></ul>
+        </div>
+      </div>
+    </details>
   </div>
 
-  <div id="notice" class="card"></div>
-
-  <div class="card">
-    <h3>Results</h3>
-    <p><span class="highlight">Commute (all vehicles) CO₂:</span> <span id="commuteVal">—</span> kg/month</p>
-    <p><span class="highlight">Electricity CO₂:</span> <span id="energyVal">—</span> kg/month</p>
-    <p><span class="highlight">LPG CO₂:</span> <span id="lpgVal">—</span> kg/month</p>
-    <p><span class="highlight">Vehicle Energy/Fuel CO₂:</span> <span id="fuelVal">—</span> kg/month</p>
-    <p><span class="highlight">Total:</span> <span id="totalVal">—</span> kg/month</p>
-    <canvas id="myChart" width="400" height="300"></canvas>
+  <!-- Sticky Action Bar -->
+  <div class="actionbar">
+    <button class="btn btn-primary" id="calcBtn" type="button">🌱 Calculate Footprint</button>
+    <div id="notice" class="notice" role="status" aria-live="polite" style="max-width:600px;"></div>
   </div>
 
-  <div class="card">
-    <h3>Estimated Monthly Spend (₹)</h3>
-    <div class="grid">
-      <div>Electricity: <span id="moneyElec">—</span></div>
-      <div>LPG: <span id="moneyLpg">—</span></div>
-      <div>Petrol: <span id="moneyPetrol">—</span></div>
-      <div>Diesel: <span id="moneyDiesel">—</span></div>
-    </div>
-    <p class="right"><span class="highlight">Total: <span id="moneyTotal">—</span></span></p>
-  </div>
-
-  <div class="card">
-    <h3>Money-Saving Tips</h3>
-    <ul id="tipsList"><li>Enter values and press Calculate to see tips.</li></ul>
-  </div>
-
-  <div class="card">
-    <h3>Leaderboard (<span id="leaderLoc">—</span>)</h3>
-    <button id="submitScoreBtn">Submit My Score</button>
-    <ul id="leaderList"></ul>
-  </div>
-
-  <div class="card">
-    <h3>Rewards</h3>
-    <p>Your points: <span id="pointsVal">0</span></p>
-    <ul id="rewardsList"></ul>
-  </div>
+  <footer>Made during our hackathon • Built with love for the planet 🌏</footer>
 
   <!-- Chart.js via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js" defer></script>
 </body>
 </html>

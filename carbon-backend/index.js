@@ -1,212 +1,152 @@
 const express = require("express");
 const cors = require("cors");
-
 const app = express();
-
-// Configure CORS
-app.use(
-  cors({
-    origin: [
-      "http://localhost:5000",
-      "http://127.0.0.1:5000",
-      "http://localhost:3000",
-    ], // Add your frontend URL
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type"],
-  })
-);
-
-// Parse JSON requests
+app.use(cors());
 app.use(express.json());
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: "Internal Server Error",
-    message: err.message,
+// ---------- Factors & Prices ----------
+const EF = {
+  // per-km travel emissions (kg CO2 per km)
+  commute: { car: 0.21, bus: 0.10, bike: 0.05, metro: 0.07, auto: 0.13, ev: 0.12 },
+  // grid electricity (India avg)
+  grid_kg_per_kwh: 0.82,
+  // LPG per 14.2 kg cylinder
+  lpg_kg_per_cylinder: 44.7,
+  // liquid fuels (kg per liter)
+  petrol_kg_per_l: 2.31,
+  diesel_kg_per_l: 2.68
+};
+
+const PRICES = {
+  rupees_per_kwh: 8,
+  petrol_per_l: 105,
+  diesel_per_l: 95,
+  lpg_per_cylinder: 1100
+};
+
+const MONTHLY_GOAL_KG = 170; // ~2 t/yr target
+
+// In-memory demo stores
+const leaderboard = new Map(); // locality => [{name,totalKg,points,ts}, ...]
+const userPoints = new Map();  // name => points
+const catalog = [
+  { id: "tree-plant", label: "Plant-a-Tree Badge", cost: 200 },
+  { id: "water-saver", label: "Water Saver Badge", cost: 150 },
+  { id: "bike-hero", label: "Bike Hero Badge", cost: 250 }
+];
+
+app.get("/", (_req, res) => res.send("Carbon API OK"));
+
+/**
+ * Body:
+ * { bill, lpgCylinders,
+ *   vehicles: [{
+ *     type: "car"|"bike"|"bus"|"metro"|"auto"|"ev",
+ *     distancePerDay?: number,                  // km/day
+ *     fuelType: "petrol"|"diesel"|"electric",   // pick one
+ *     fuelAmountPerMonth?: number               // L for petrol/diesel, kWh for electric
+ *   }]
+ * }
+ */
+app.post("/calculate", (req, res) => {
+  const { bill = 0, lpgCylinders = 0, vehicles = [] } = req.body || {};
+
+  // Home electricity
+  const units = Number(bill) / PRICES.rupees_per_kwh;
+  const electricityKg = Math.max(0, units * EF.grid_kg_per_kwh);
+
+  // Cooking gas
+  const lpgKg = Math.max(0, Number(lpgCylinders) * EF.lpg_kg_per_cylinder);
+
+  // Vehicles
+  let commuteVehiclesKg = 0, petrolVehiclesKg = 0, dieselVehiclesKg = 0, evEnergyKg = 0;
+
+  if (Array.isArray(vehicles)) {
+    for (const v of vehicles) {
+      const type = (v?.type || "car").toLowerCase();
+      const fuelType = (v?.fuelType || "").toLowerCase(); // petrol|diesel|electric
+      const kmPerDay = Math.max(0, Number(v?.distancePerDay) || 0);
+      const fuelAmount = Math.max(0, Number(v?.fuelAmountPerMonth) || 0);
+
+      // Commute (km/day × 30 × factor)
+      const perKm = EF.commute[type] ?? EF.commute.car;
+      commuteVehiclesKg += kmPerDay * perKm * 30;
+
+      // Fuel/energy
+      if (fuelType === "petrol") petrolVehiclesKg += fuelAmount * EF.petrol_kg_per_l;
+      else if (fuelType === "diesel") dieselVehiclesKg += fuelAmount * EF.diesel_kg_per_l;
+      else if (fuelType === "electric") evEnergyKg += fuelAmount * EF.grid_kg_per_kwh; // kWh × grid
+    }
+  }
+
+  const fuelVehiclesKg = petrolVehiclesKg + dieselVehiclesKg + evEnergyKg;
+  const totalKg = +(electricityKg + lpgKg + commuteVehiclesKg + fuelVehiclesKg).toFixed(1);
+
+  // Money (EV kWh not priced here to avoid double counting with home bill)
+  const petrolLitersTotal = Array.isArray(vehicles)
+    ? vehicles.reduce((a, v) => a + (v?.fuelType === "petrol" ? Number(v?.fuelAmountPerMonth) || 0 : 0), 0) : 0;
+  const dieselLitersTotal = Array.isArray(vehicles)
+    ? vehicles.reduce((a, v) => a + (v?.fuelType === "diesel" ? Number(v?.fuelAmountPerMonth) || 0 : 0), 0) : 0;
+
+  const money = {
+    electricity: Math.max(0, Number(bill) || 0),
+    lpg: Math.max(0, Number(lpgCylinders) * PRICES.lpg_per_cylinder),
+    petrol: Math.max(0, petrolLitersTotal * PRICES.petrol_per_l),
+    diesel: Math.max(0, dieselLitersTotal * PRICES.diesel_per_l)
+  };
+  money.total = money.electricity + money.lpg + money.petrol + money.diesel;
+
+  const warning = totalKg > MONTHLY_GOAL_KG
+    ? { level: "above_target", goal: MONTHLY_GOAL_KG, overBy: +(totalKg - MONTHLY_GOAL_KG).toFixed(1) }
+    : { level: "on_target", goal: MONTHLY_GOAL_KG, remaining: +(MONTHLY_GOAL_KG - totalKg).toFixed(1) };
+
+  const tips = [];
+  if (vehicles.some(v => ["car","auto"].includes((v?.type||"").toLowerCase()))) {
+    tips.push("Swap 2 days/week to public transit to cut commute CO₂ by ~30%.");
+    tips.push("Carpool once a week and combine errands.");
+  }
+  if (bill > 0) {
+    tips.push("Set AC to 26°C and use a fan: saves ~10–20% electricity.");
+    tips.push("Switch to LED and turn off standby loads to save 10–15%.");
+  }
+  if (lpgCylinders > 0) tips.push("Use pressure cooker and batch-cook to reduce LPG use.");
+
+  res.json({
+    parts: { electricityKg, lpgKg, commuteVehiclesKg, petrolVehiclesKg, dieselVehiclesKg, evEnergyKg },
+    totalKg, goal: MONTHLY_GOAL_KG, warning, money, tips
   });
 });
 
-// CO2 Emission Factors (kg CO2 per km/litre per fuel)
-const vehicleEmissionFactors = {
-  petrol: {
-    bike: 0.065,
-    car: 0.192,
-    auto: 0.113,
-  },
-  diesel: {
-    car: 0.171,
-    auto: 0.102,
-  },
-  electric: {
-    car: 0.045,
-    bike: 0.015,
-  },
-};
-
-// Electricity and gas emissions (kg CO2 per ₹)
-const electricityFactor = 0.82 / 8; // ₹8/kWh → 0.1025 kg CO2/₹
-const gasFactor = 2.983 / 70; // ₹70 per kg → 0.0426 kg CO2/₹
-
-const SAFE_CO2_THRESHOLD = 180; // kg/month (example safe level)
-const POINTS_PER_KG_SAVED = 0.5;
-
-app.get("/", (_req, res) => {
-  res.send("Carbon API is running!");
+// Leaderboard / points / rewards
+app.post("/score", (req, res) => {
+  const { name = "Guest", locality = "Global", totalKg = 0 } = req.body || {};
+  const cleanName = String(name).slice(0, 30);
+  const cleanLoc = String(locality).slice(0, 40);
+  const pointsEarned = Math.max(0, Math.round(500 - Number(totalKg)));
+  const current = userPoints.get(cleanName) || 0;
+  userPoints.set(cleanName, current + pointsEarned);
+  const list = leaderboard.get(cleanLoc) || [];
+  list.push({ name: cleanName, totalKg: Number(totalKg), points: current + pointsEarned, ts: Date.now() });
+  list.sort((a, b) => b.points - a.points);
+  leaderboard.set(cleanLoc, list.slice(0, 10));
+  res.json({ ok: true, pointsEarned, totalPoints: userPoints.get(cleanName) });
 });
 
-// POST /calculate
-app.post("/calculate", (req, res) => {
-  try {
-    const {
-      vehicles = [],
-      bill: electricityBill = 0,
-      lpg: lpgCylinders = 0,
-    } = req.body;
-
-    let totalCommuteCO2 = 0;
-    let totalFuelCO2 = 0;
-
-    // Calculate emissions from each vehicle
-    vehicles.forEach((v) => {
-      const {
-        type: vehicleType = "car",
-        fuelType = "petrol",
-        distancePerDay = 0,
-        fuelAmountPerMonth = 0,
-      } = v;
-
-      const factor =
-        (vehicleEmissionFactors[fuelType] &&
-          vehicleEmissionFactors[fuelType][vehicleType]) ||
-        0.15; // default fallback
-
-      if (distancePerDay > 0) {
-        const monthlyCO2 = distancePerDay * 30 * factor; // assume 30 days of commute
-        totalCommuteCO2 += monthlyCO2;
-      } else if (fuelAmountPerMonth > 0) {
-        const monthlyCO2 =
-          fuelAmountPerMonth * factor * (fuelType === "electric" ? 0.82 : 2.31); // kWh or L to CO2
-        totalFuelCO2 += monthlyCO2;
-      }
-    });
-
-    const electricityCO2 = electricityBill * electricityFactor;
-    const lpgCO2 = lpgCylinders * 46.1; // Each cylinder ~ 46.1 kg CO2
-
-    const totalCO2 = +(
-      totalCommuteCO2 +
-      electricityCO2 +
-      lpgCO2 +
-      totalFuelCO2
-    ).toFixed(1);
-    const co2Status =
-      totalCO2 > SAFE_CO2_THRESHOLD
-        ? "⚠️ Warning: Emissions above safe monthly level!"
-        : "✅ Emissions within safe level";
-
-    const potentialSavings = +Math.max(
-      0,
-      totalCO2 - SAFE_CO2_THRESHOLD
-    ).toFixed(1);
-    const pointsEarned = Math.floor(potentialSavings * POINTS_PER_KG_SAVED);
-
-    // Calculate monthly spending
-    const moneyElectricity = electricityBill;
-    const moneyLpg = lpgCylinders * 1100; // Approx ₹1100 per cylinder
-    const moneyPetrol = vehicles.reduce(
-      (acc, v) =>
-        v.fuelType === "petrol" && v.fuelAmountPerMonth
-          ? acc + v.fuelAmountPerMonth * 100
-          : acc,
-      0
-    );
-    const moneyDiesel = vehicles.reduce(
-      (acc, v) =>
-        v.fuelType === "diesel" && v.fuelAmountPerMonth
-          ? acc + v.fuelAmountPerMonth * 90
-          : acc,
-      0
-    );
-
-    res.json({
-      commuteCO2: +totalCommuteCO2.toFixed(1),
-      electricityCO2: +electricityCO2.toFixed(1),
-      lpgCO2: +lpgCO2.toFixed(1),
-      fuelCO2: +totalFuelCO2.toFixed(1),
-      totalCO2,
-      co2Status,
-      pointsEarned,
-      tips: generateTips(totalCO2),
-      money: {
-        electricity: moneyElectricity,
-        lpg: moneyLpg,
-        petrol: moneyPetrol,
-        diesel: moneyDiesel,
-        total: moneyElectricity + moneyLpg + moneyPetrol + moneyDiesel,
-      },
-    });
-  } catch (error) {
-    res
-      .status(500)
-      .json({ error: "Calculation error", details: error.message });
-  }
+app.get("/leaderboard", (req, res) => {
+  const locality = String(req.query.locality || "Global");
+  res.json({ locality, top: leaderboard.get(locality) || [] });
 });
 
-// Store leaderboard data in memory (in a real app, use a database)
-const leaderboardData = new Map();
-
-// Get leaderboard data
-app.get("/leaderboard/:locality", (req, res) => {
-  const locality = req.params.locality || "Global";
-  const scores = leaderboardData.get(locality) || [];
-  res.json(scores.sort((a, b) => b.score - a.score).slice(0, 10));
-});
-
-// Submit score to leaderboard
-app.post("/leaderboard", (req, res) => {
-  const { name, locality, score } = req.body;
-  if (!name || !locality || typeof score !== "number") {
-    return res.status(400).json({ error: "Invalid data" });
-  }
-
-  const localityScores = leaderboardData.get(locality) || [];
-  localityScores.push({ name, locality, score });
-  leaderboardData.set(locality, localityScores);
-
-  res.json({ success: true, message: "Score submitted successfully" });
-});
-
-// Redeem points - (Mocked)
+app.get("/rewards", (_req, res) => res.json({ catalog }));
 app.post("/redeem", (req, res) => {
-  const { points } = req.body;
-  if (points >= 100) {
-    res.json({ success: true, message: "🎁 Reward redeemed!" });
-  } else {
-    res.json({ success: false, message: "❌ Not enough points to redeem." });
-  }
+  const { name = "Guest", rewardId } = req.body || {};
+  const reward = catalog.find(r => r.id === rewardId);
+  if (!reward) return res.status(400).json({ ok: false, error: "Invalid reward" });
+  const pts = userPoints.get(name) || 0;
+  if (pts < reward.cost) return res.status(400).json({ ok: false, error: "Not enough points" });
+  userPoints.set(name, pts - reward.cost);
+  res.json({ ok: true, reward, remainingPoints: userPoints.get(name) });
 });
 
-// Tips Generator
-function generateTips(co2) {
-  const tips = [];
-
-  if (co2 > 200) tips.push("Use public transport at least 3x a week.");
-  if (co2 > 150) tips.push("Switch to energy-efficient appliances.");
-  if (co2 > 120) tips.push("Consider carpooling with colleagues.");
-  if (co2 > 100) tips.push("Switch to LED lighting and unplug idle devices.");
-  if (co2 > 80) tips.push("Keep AC usage minimal and use fans more.");
-  if (co2 > 60) tips.push("Cycle short distances instead of driving.");
-  if (co2 > 50) tips.push("Schedule a home energy audit.");
-
-  if (tips.length === 0) tips.push("You're doing great! 🌱");
-
-  return tips;
-}
-
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`✅ Backend running at http://localhost:${PORT}`)
-);
+const port = process.env.PORT || 5000;
+app.listen(port, () => console.log(`Backend running on ${port}`));
